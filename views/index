@@ -1,0 +1,1 @@
+What is your name?<br /><form action=ready><input type='text' name='name' value='...'/><input type='submit' value='go'/></form>
