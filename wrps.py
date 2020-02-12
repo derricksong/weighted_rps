@@ -1,16 +1,27 @@
 #!/usr/bin/python3
+"""
+Idea by Derrick Song
+Initial code by Ben Walther
+"""
 
 import cherrypy
+
+
 class rps(object):
 
     cherrypy.server.socket_host = '0.0.0.0'
     players = {}
     games = []
 
+    
     @cherrypy.expose
     def index(self):
-        return "What is your name?<br /><form action=ready><input type='text' name='name' value='...'/><input type='submit' value='go'/></form>"
+        return """
+        "What is your name?<br />
+        <form action=ready><input type='text' name='name' value='...'/><input type='submit' value='go'/></form>"
+        """
 
+    
     @cherrypy.expose
     def ready(self,name='nothing'):
         output = "You are %s. No? <a href='/'>back</a><br /><br />"%name
@@ -24,11 +35,9 @@ class rps(object):
         self.players[name] = 'ready'
         return output
 
+    
     def start(self,player):
         moves = []
         pass
-
-
-
 
 cherrypy.quickstart(rps())
