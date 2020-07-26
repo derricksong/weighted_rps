@@ -1,0 +1,11 @@
+---
+challenge:
+move:
+accept:
+history:
+score:
+games:
+leaderboard:
+about:
+  description: "it's a sweet weighted rps game.  3 points for winning with rock, 2 points for scissors, and 1 point for paper"
+...

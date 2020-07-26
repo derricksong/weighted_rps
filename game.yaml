@@ -1,0 +1,19 @@
+game:
+  state: 
+  p1_name: 
+  p2_name: 
+  p1_score: 0
+  p2_score: 0
+  game_winner: 
+  game_loser: 
+  rounds:
+    - 'p1_move': '',
+      'p2_move': '',
+      'p1_score': 0,
+      'p2_score': 0,
+      'winner': 'draw'
+
+players:
+  'd$#3866':
+     wins: 0
+     losses: 0
