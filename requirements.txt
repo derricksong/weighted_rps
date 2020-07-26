@@ -10,9 +10,11 @@ jaraco.classes==3.1.0
 jaraco.collections==3.0.0
 jaraco.functools==3.0.1
 jaraco.text==3.2.0
+mmh3==2.5.1
 more-itertools==8.4.0
 multidict==4.7.6
 portend==2.6
+pottery==0.71
 python-dotenv==0.14.0
 pytz==2020.1
 PyYAML==5.3.1

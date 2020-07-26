@@ -1,6 +1,8 @@
 ---
 challenge:
-move:
+rock:
+paper:
+scissors:
 accept:
 history:
 score:
