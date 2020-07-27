@@ -61,6 +61,7 @@ p2_id = game['p2']['id'] = 1
 state = game['state'] = 'idle'
 players = game['players'] = {'foo': 'bar'}
 client = discord.Client()
+timer = 3
 
 @client.event
 async def on_message(message):
@@ -130,24 +131,24 @@ async def on_message(message):
     print(f'p1: {p1} p2: {p2} user: {player}, opponent: {opponent}, now: {now}')
 
     async def play_round(now):
-      await channel.send(f'round {gr} started! wait 5 seconds to think about your move')
-      await asyncio.sleep(5)
+      await channel.send(f'round {gr} started! wait {timer} seconds to think about your move')
+      await asyncio.sleep(timer)
       await channel.send(f'{p1}: react to this message with an emoji containing your move in the name')
       await channel.send(f'{p2}: react to this message with an emoji containing your move in the name')
 
-      p1_wait = await client.wait_for(
+      p1_wait = client.wait_for(
         'reaction_add', 
-        timeout = 9.0, 
-        check = lambda reaction, p1: str(reaction.message.author) == p1
+        timeout = 19.0, 
+        check = lambda reaction, user: str(user) == p1
       )
-      p2_wait = await client.wait_for(
+      p2_wait = client.wait_for(
         'reaction_add', 
-        timeout = 9.0, 
-        check = lambda reaction, p2: str(reaction.message.author) == p2
+        timeout = 19.0, 
+        check = lambda reaction, user: str(user) == p2
       )
 
 #      try:
-#        await asyncio.gather(p1_wait, p2_wait)
+      await asyncio.gather(p1_wait, p2_wait)
 #      except asyncio.TimeoutError:
 #        await message.delete() 
 
@@ -183,10 +184,10 @@ async def on_message(message):
           await client.wait_for('message', timeout=30.0, check=lambda msg: (msg.content == '!wrps accept' and str(msg.author) == p2))
           state = 'active'
           await channel.send(f'challenge accepted!  {p1} vs {p2} starting...')
-          await display_score()
-          await start_game()
         except asyncio.TimeoutError:
           await channel.send('Timed out, awaiting new challenge')
+        await display_score()
+        await start_game()
       elif cmd == 'score':
         await display_score()
       elif cmd == 'leaderboard':
@@ -197,6 +198,7 @@ async def on_message(message):
 
 @client.event
 async def on_reaction_add(reaction, user):
+  print(f'reaction: {reaction.emoji.name}, user {user}')
   global rounds
   if (str(user) in [p1, p2] and 'containing your move' in reaction.message.content):
     player = 'p1' if p1 == str(user) else 'p2'
@@ -204,9 +206,10 @@ async def on_reaction_add(reaction, user):
     now = rounds[gr]
 
     for move in moves:
-      if emoji.find(move) != -1:
+      if emoji.name.find(move) != -1:
         now[player] = move
         try:
+          print(f'now: {now} player {player} move {move}')
           await reaction.message.delete()
         except Exception as e:
           print(e)
