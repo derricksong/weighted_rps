@@ -12,148 +12,203 @@ import asyncio
 import yaml
 import json
 import re
-from redis import Redis
-import pottery
+from redisworks import Root
 from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
-YAML_FILES = ['commands',]
+description = '''Weighted Rock, Paper, Scissors (!wrps)
+An improved version of rock, paper scissors
+Winning with different choices scores varying amounts of points
+Rock: 3, Scissors: 2, Paper: 1
+Type '!wrps challenge <opponent>' to begin
+'''
+commands = [
+  'about',
+  'challenge',
+  'score'
+]
+moves = [
+  'rock',
+  'paper',
+  'scissors'
+]
 
-config = {}
-for f in YAML_FILES:
-  with open(f'{f}.yaml') as file:
-    config[f] = yaml.load(file, Loader=yaml.FullLoader)
-cmds = config['commands']
+class game(Root):
+  pass
 
-redis = Redis.from_url('redis://localhost:6379')
-game = pottery.RedisDict(redis=redis, key='game')
-p1 = game['p1'] if 'p1' in game else ''
-p2 = game['p2'] if 'p2' in game else ''
-p1_score = game['p1_score'] if 'p1_score' in game else 0
-p2_score = game['p2_score'] if 'p2_score' in game else 0
-game_round = game['round'] if 'round' in game else 0
-print(game)
-
+game = game()
+game.flush()
+gr = game['round'] = 0
+rounds = game['rounds'] = {gr: {'winner': 'n/a'}}
+game['p1'] = {
+  'name': 'n/a',
+  'id': 1,
+  'score': 0
+}
+game['p2'] = {
+  'name': 'n/a',
+  'id': 2,
+  'score': 0
+}
+p1 = game['p1']['name']
+p2 = game['p2']['name']
+p1_sc = game['p1']['score'] = 0
+p2_sc = game['p2']['score'] = 0
+p1_id = game['p1']['id'] = 0
+p2_id = game['p2']['id'] = 1
+state = game['state'] = 'idle'
+players = game['players'] = {'foo': 'bar'}
 client = discord.Client()
+
 @client.event
 async def on_message(message):
+  global p1
+  global p2
+  global p1_sc
+  global p2_sc
+  global gr
+  global rounds
+  global p1_id
+  global p2_id
   user = message.author
   content = message.content
   channel = message.channel
 
-  async def score_round(n):
-    now = game[f'round_{str(n+1)}']
-    if now[p1] == rock:
-      if now[p2] == 'rock':
+  async def score_round(now):
+    global p1_sc
+    global p2_sc
+    global gr
+    global rounds
+
+    if now['p1'] == 'rock':
+      if now['p2'] == 'rock':
         now['winner'] = 'draw'
-      elif now[p2] == 'paper':
+      elif now['p2'] == 'paper':
         now['winner'] = 'p2'
-        p2_score += 1
-      elif now[p2] == 'scissors':
+        p2_sc += 1
+      elif now['p2'] == 'scissors':
         now['winner'] = 'p1'
-        p1_score += 3
-    elif now[p1] == 'paper':
-      if now[p2] == 'rock':
-        now['winner'] = p1
-        p1_score += 1
-      elif now[p2] =='paper':
+        p1_sc += 3
+    elif now['p1'] == 'paper':
+      if now['p2'] == 'rock':
+        now['winner'] = 'p1'
+        p1_sc += 1
+      elif now['p2'] =='paper':
         now['winner'] = 'draw'
-      elif now[p2] =='scissors':
-        now['winner'] = p2
-        p2_score += 2
-    elif now[p1] == 'scissors':
-      if now[p2] == 'rock':
-        now['winner'] = p2
-        p2_score += 3
-      elif now[p2] == 'scissors':
+      elif now['p2'] =='scissors':
+        now['winner'] = 'p2'
+        p2_sc += 2
+    elif now['p1'] == 'scissors':
+      if now['p2'] == 'rock':
+        now['winner'] = 'p2'
+        p2_sc += 3
+      elif now['p2'] == 'scissors':
         now['winner'] = 'draw'
-      elif now[p2] == 'paper':
-        now['winner'] == p1
-        p1_score += 2
-    game['round'] += 1
-    game[f'round_{str(n+1)}'] = {}
+      elif now['p2'] == 'paper':
+        now['winner'] == 'p1'
+        p1_sc += 2
+    await channel.send(f'round {gr} completed!  next round starting')
+    gr += 1
+    rounds[gr] = {'winner': 'n/a'}
     await display_score()
-    if (game['p1_score'] >= 10 or game['p2_score'] >= 10):
-      winner = game['p1'] if game['p1_score'] >= 10 else game['p2']
-      channel.send(f'We have a **WINNER**! **{winner}** is the **CHAMPION**!')
+    if (p1_sc >= 10 or p2_sc >= 10):
+      winner = p1 if p1_sc >= 10 else p2
+      winner_id = p1_id if p1_sc >= 10 else p2_id
+      state = 'idle'
+      await channel.send(f'We have a **WINNER**! <@!{winner_id}> is the **CHAMPION**!')
 
   async def display_score():
-    await channel.send(f'round {game_round + 1}\'s score: [{game["p1"]}] {p1_score} - [{game["p2"]}] {p2_score}')
+    await channel.send(f'round {gr}\'s score: [{p1}] {p1_sc} - [{p2}] {p2_sc}')
+
+  async def start_game():
+    global rounds
+    now = rounds[gr]
+    player = 'p1' if str(user) == p1 else 'p2'
+    opponent = 'p2' if player == 'p1' else 'p1'
+    print(f'p1: {p1} p2: {p2} user: {player}, opponent: {opponent}, now: {now}')
+
+    async def play_round(now):
+      await channel.send(f'round {gr} started! wait 5 seconds to think about your move')
+      await asyncio.sleep(5)
+      await channel.send(f'{p1}: react to this message with an emoji containing your move in the name')
+      await channel.send(f'{p2}: react to this message with an emoji containing your move in the name')
+
+      p1_wait = await client.wait_for(
+        'reaction_add', 
+        timeout = 9.0, 
+        check = lambda reaction, p1: str(reaction.message.author) == p1
+      )
+      p2_wait = await client.wait_for(
+        'reaction_add', 
+        timeout = 9.0, 
+        check = lambda reaction, p2: str(reaction.message.author) == p2
+      )
+
+#      try:
+#        await asyncio.gather(p1_wait, p2_wait)
+#      except asyncio.TimeoutError:
+#        await message.delete() 
+
+      await score_round(now)
+
+    while (p1_sc < 10 and p2_sc < 10):
+      await play_round(now)
 
   if content.startswith('!wrps'):
-    print('!wrps match detected')
     full_cmd = content.split('!wrps ')[1]
     cmd = full_cmd.split(' ')[0]
-    print(f'full cmd: {full_cmd}')
-    print(f'cmd: "{cmd}"')
-    if cmd in cmds.keys():
+    if cmd in commands:
       if cmd == 'challenge':
-        print(f'challenge detected by {user}')
         if len(full_cmd.split(' ')) > 1:
           opponent = full_cmd.split(' ')[1]
           opp_id = re.findall(r'\d+', opponent)[0]
-          print(opponent)
-          print(opp_id)
-          print(game)
           try:
             opponent = await client.fetch_user(opp_id)
-            game['state'] = 'challenge'
-            game['p1'] = str(user)
-            game['p1_id'] = user.id
-            game['p2'] = str(opponent)
-            game['p2_id'] = opponent.id
-            game['p1_score'] = 0
-            game['p2_score'] = 0
-            game['round'] = 0
-            game['round_0'] = {}
-            print(f'user: {user}, opponent: {opponent}')
+            state = 'challenge'
+            p1 = str(user)
+            p1_id = user.id
+            p2 = str(opponent)
+            p2_id = opponent.id
+            p1_sc = 0
+            p2_sc = 0
+            gr = 1
+            rounds = {gr: {'winner': 'n/a'}}
             await channel.send(f'{user.mention} has issued a challenge to {opponent.mention}')
           except:
             await channel.send(f'Invalid user: {opp_id}')
 
         try:
-          await client.wait_for('message', timeout=30.0, check=lambda message: (message.content == '!wrps accept' and str(message.author) == game['p2']))
-          game['state'] = 'active'
-          await channel.send(f'challenge accepted, mute your opponent!  {game["p1"]} vs {game["p2"]} starting...')
+          await client.wait_for('message', timeout=30.0, check=lambda msg: (msg.content == '!wrps accept' and str(msg.author) == p2))
+          state = 'active'
+          await channel.send(f'challenge accepted!  {p1} vs {p2} starting...')
           await display_score()
-          return
+          await start_game()
         except asyncio.TimeoutError:
           await channel.send('Timed out, awaiting new challenge')
-
-      elif cmd == 'history':
-        return
-      elif cmd in ('rock', 'paper', 'scissors'):
-        print('choice detected')
-        now = game[f'round_{game["round"]}']
-        player = 'p1' if str(user) == game['p1'] else 'p2'
-        opponent = 'p1' if player == 'p2' else 'p2'
-        print(f'user: {user}, opponent: {opponent}, now: {now}')
-        if not (player in now or opponent in now):
-          print('no choices detected')
-          now[player] = cmd
-          try:
-            await channel.send(f'{game[player]} made their selection!  Waiting 30 seconds for the other player')
-            print(game)
-            print(f'{user} {opponent} {now}')
-            await client.wait_for('message', timeout=30.0, check=lambda msg: (str(msg.author) == game[opponent] and msg.content in ('!wrps rock' or '!wrps scissor' or '!wrps paper')))
-          except asyncio.TimeoutError:
-            await channel.send(f'Timed out, {game[opponent]} didn\'t make a selection..')
-        if player in now:
-          print(f'Changing {player}\'s move to {cmd}')
-          now[player] = cmd
-        if opponent in now:
-          now[player] = cmd
-          channel.send(f'{player} made their move.  Both players have made a selection')
-          if (player in now and opponent in now):
-            score_round(game['round'])
       elif cmd == 'score':
         await display_score()
       elif cmd == 'leaderboard':
-        channel.send(players)
+        await channel.send(players)
       elif cmd == 'about':
         print('about detected')
-        await message.channel.send(cmds['about']['description'])
+        await message.channel.send(description)
+
+@client.event
+async def on_reaction_add(reaction, user):
+  global rounds
+  if (str(user) in [p1, p2] and 'containing your move' in reaction.message.content):
+    player = 'p1' if p1 == str(user) else 'p2'
+    emoji = reaction.emoji
+    now = rounds[gr]
+
+    for move in moves:
+      if emoji.find(move) != -1:
+        now[player] = move
+        try:
+          await reaction.message.delete()
+        except Exception as e:
+          print(e)
 
 client.run(TOKEN)
